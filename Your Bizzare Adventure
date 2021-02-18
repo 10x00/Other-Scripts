@@ -1,0 +1,468 @@
+--// Load Init //--
+loadstring(game:HttpGet("https://angusscript.glitch.me/Init.lua"))();
+
+--// GetService //--
+local serv = {};
+setmetatable(serv, {__index = function(a,b) return game:GetService(b) end, __newindex = function(t,k) t[k] = nil return end});
+
+--// Gui Library //--
+local A = loadstring(game:HttpGet("http://angusscript.glitch.me/lib.lua", true))();
+local B = A:new("YBA");
+
+--// Pages //--
+local C1 = B:newPage("Main");
+
+local C999 = B:newPage("Visuals");
+local C1000 = B:newPage("Client");
+
+--// Variable //--
+local plr = serv.Players.LocalPlayer;
+local cam = workspace.CurrentCamera;
+local runservice = serv.RunService;
+local Distance = {0, 0, 4};
+local Speed = 9999999999999;
+
+local ESP = {
+    Enabled = false,
+    Name = false,
+    Boxes = false,
+};
+
+local Main = {
+    Mob = "",
+    Quest = "",
+    AutoFarm = false,
+    AutoQuest = false,
+}
+
+--// Script //--
+
+--[[
+    Tab - Main
+]]
+
+--// Anti TP Back //--
+pcall(function()
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self,...)
+        local args = {...};
+        if self == plr.Character.RemoteFunction then
+            if tostring(args[1]):match("Return") then -- ReturnCanTP or ReturnCFrame
+                return
+            end
+        end
+        return old(self,...)
+    end)
+    setreadonly(mt, true)
+end)
+
+-- TP Bypass
+local old;
+old = hookfunction(getrawmetatable(game).__namecall,function(...)
+    local args = {...}
+    local method = getnamecallmethod()
+    if method == "Kick" then
+        return wait(1e17)
+    elseif method == "InvokeServer" then
+        return true
+    elseif Enabled and not checkcaller() and method == "FireServer" and (args[2] == "UpdateState" or args[2] == "InputEnded" or args[2] == "InputBegan") then
+        return
+    end
+    return old(...)
+end)
+
+
+
+--[[
+    TweenTP Arguments: 
+    - Client/LocalPlayer, 
+    - <Instance> Part, 
+    - <Table> Distance, 
+    - <Number/Int> Speed
+]] 
+local function TweenTP(a, b, c, d) 
+    if not type(c) == "table" then return end 
+    if typeof(b) == "CFrame" then IsCFrame = true end 
+    local a = a or plr; 
+    pcall(function() 
+        if IsCFrame then 
+            local cframe = b; 
+            local vector3 = cframe.p; 
+            local Info = TweenInfo.new(a:DistanceFromCharacter(vector3 + Vector3.new(unpack(c))) / d, Enum.EasingStyle.Linear, Enum.EasingDirection.Out); 
+            local tweens = game:service'TweenService':Create(a.Character.HumanoidRootPart, Info, {CFrame = cframe + Vector3.new(unpack(c))}):Play(); 
+            wait(a:DistanceFromCharacter(vector3 + Vector3.new(unpack(c))) / d); 
+        else 
+            local Info = TweenInfo.new(a:DistanceFromCharacter(b.Position + Vector3.new(unpack(c))) / d, Enum.EasingStyle.Linear, Enum.EasingDirection.Out); 
+            local tweens = game:service'TweenService':Create(a.Character.HumanoidRootPart, Info, {CFrame = b.CFrame * CFrame.new(unpack(c))}):Play(); 
+            wait(a:DistanceFromCharacter(b.Position + Vector3.new(unpack(c))) / d); 
+        end 
+    end) 
+end
+
+C1:addLabel("Farming")
+
+--// Add List //--
+local AcKLp,jIeYY = {},{}
+pcall(function()
+    --// Add Mob //--
+    for _,v in pairs(workspace.Mob_Spawns:GetChildren()) do if v:IsA("Part") then table.insert(AcKLp, v.Name) end end
+    local newArr = RDuplicated(AcKLp);
+    for i in pairs(AcKLp) do AcKLp[i] = nil end
+    for _,v in pairs(newArr) do table.insert(AcKLp, v) end
+    Main.Mob = AcKLp[1]
+
+    --// Add Quest //--
+    for _,v in pairs(workspace.Dialogues:GetChildren()) do if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name:match("%d+") then table.insert(jIeYY, v.Name) end end
+    local newArr = RDuplicated(jIeYY);
+    for i in pairs(jIeYY) do jIeYY[i] = nil end
+    for _,v in pairs(newArr) do table.insert(jIeYY, v) end
+    Main.Quest = jIeYY[1]
+end)
+--// End Script //--
+
+C1:addDropdown("Mob", AcKLp, function(v)
+    Main.Mob = v 
+end)
+C1:addDropdown("Quest", jIeYY, function(v)
+    Main.Quest = v 
+end)
+
+--// Toggle //--
+C1:addToggle("Auto Farm", false, function(v)
+    Main.AutoFarm = v
+    local s;
+    s = runservice.RenderStepped:Connect(function()
+        if Main.AutoFarm == true then pcall(function() plr.Character.Humanoid:ChangeState(10); plr.Character.HumanoidRootPart.Velocity = Vector3.new(); end) end
+        if Main.AutoFarm == false then s:Disconnect() end
+    end)
+    while Main.AutoFarm do
+        pcall(function()
+            if Main.AutoQuest then
+                local function Check() 
+                    if plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("QuestProgress") and plr.PlayerStats:FindFirstChild("QuestMaxProgress") then
+                        if plr:FindFirstChild("LoadedData") and plr.LoadedData.Value == true then
+                            local stats = plr.PlayerStats;
+                            if (stats.QuestProgress.Value == stats.QuestMaxProgress.Value) == true then 
+                                return true
+                            else
+                                return false
+                            end
+                        end
+                    end 
+                end
+                if Check() then --// If Quest Progress Maxes, will Grab another Quest aka selected quest //--
+                    local function Get() for _,v in pairs(workspace.Dialogues:GetChildren()) do if v:IsA("Model") and v.Name == Main.Quest then return v end end end
+                    local NPC = Get()
+                    if NPC then
+                        if not plr.PlayerGui:FindFirstChild("Dialogue") then
+                            repeat
+                                pcall(function()
+                                    TweenTP(nil, NPC.HumanoidRootPart, Distance, Speed)
+                                end)
+                                wait()
+                                pcall(function()
+                                    fireclickdetector(NPC.TalkBox.ClickDetector);
+                                end)
+                            until plr.PlayerGui:FindFirstChild("Dialogu") or not Main.AutoQuest or not Main.AutoFarm
+                        else
+                            local A = plr.PlayerGui:FindFirstChild("Dialogue");
+                            local _A = {};
+                            if #_A <= 0 then 
+                                for _,v in pairs(A:GetChildren()) do 
+                                    if v.Name:match("Dialogue%d+") and v:FindFirstChild("Option1") and v:FindFirstChild("Option2") then 
+                                        table.insert(_A, v.Name) 
+                                    end 
+                                end 
+                            end
+                            table.sort(_A)
+                            local function B() 
+                                for i,v in pairs(_A) do 
+                                    if i == #_A then
+                                        if A:FindFirstChild("Dialogues") and A.Dialogues:FindFirstChild(v) then 
+                                            local C = A.Dialogues:FindFirstChild(v); 
+                                            if C:FindFirstChild("Option1") or C:FindFirstChild("Option2") then 
+                                                local C2 = C:FindFirstChild("Option1") or C:FindFirstChild("Option2");
+                                                if C2:FindFirstChild("NexDialogue") then 
+                                                    return C2:FindFirstChild("NextDialogue") 
+                                                end 
+                                            end 
+                                        end
+                                    end 
+                                end 
+                            end
+                            local C = B()
+                            if C then
+                                local Remote = plr.Character:FindFirstChild("RemoteEvent");
+                                Remote:FireServer("EndDialogue", {["NPC"] = Main.Quest, ["Option"] = tostring(C.Parent), ["Dialogue"] = tostring(C.Value)})
+                                --// Dracula Quest //--
+                                Remote:FireServer("EndDialogue", {["NPC"] = Main.Quest, ["Option"] = tostring(C.Parent), ["Dialogue"] = tostring(C.Parent.Parent)})
+                            end
+                        end
+                    end
+                else  --// If Quest Progress is not Maxed, script will auto finish the quest or old quest client have //--
+                    local function GetQMob() for _,v in pairs(plr.PlayerGui.HUD.Main.Frames.Quest.Quests:GetChildren()) do if v:IsA("Frame") and v.Name ~= "Sample" then for _,v2 in pairs(AcKLp) do if v.Name:lower():match(v2:lower()) then return v.Name:lower():match(v2:lower()) end end end end end
+                    local QMob = GetQMob()
+                    if QMob then
+                        local function Get() for _,v in pairs(workspace.Living:GetChildren()) do if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name:lower() == QMob and v.Humanoid.Health > 0 then return v end end end
+                        local Mob = Get()
+                        if Mob then
+                            repeat
+                                pcall(function()
+                                    TweenTP(nil, Mob.HumanoidRootPart, Distance, Speed)
+                                end)
+                                wait()
+                                pcall(function()
+                                    if Mob:FindFirstChild("RagdollScript") then Mob:FindFirstChild("RagdollScript"):remove() end
+                                    local Remote = plr.Character:FindFirstChild("RemoteEvent");
+                                    Remote:FireServer("InputBegan", {["Input"] = Enum.UserInputType.MouseButton1});
+                                    Remote:FireServer("InputEnded", {["Input"] = Enum.UserInputType.MouseButton1});
+                                    if Mob:FindFirstChild("Health") and Mob.Health.Value <= 0 then Mob:remove() end
+                                end)
+                            until not QMob or not Mob or Mob.Health.Value <= 0 or not Main.AutoQuest or not Main.AutoFarm
+                        end
+                    end
+                end
+            else
+                local function Get() for _,v in pairs(workspace.Living:GetChildren()) do if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name == Main.Mob and v.Humanoid.Health > 0 then return v end end end
+                local Mob = Get()
+                if Mob then
+                    repeat
+                        pcall(function()
+                            TweenTP(nil, Mob.HumanoidRootPart, Distance, Speed)
+                        end)
+                        wait()
+                        pcall(function()
+                            if Mob:FindFirstChild("RagdollScript") then Mob:FindFirstChild("RagdollScript"):remove() end
+                            local Remote = plr.Character:FindFirstChild("RemoteEvent");
+                            Remote:FireServer("InputBegan", {["Input"] = Enum.UserInputType.MouseButton1});
+                            Remote:FireServer("InputEnded", {["Input"] = Enum.UserInputType.MouseButton1});
+                            if Mob:FindFirstChild("Health") and Mob.Health.Value <= 0 then Mob:remove() end
+                        end)
+                    until not Mob or Mob.Health.Value <= 0 or not Main.AutoQuest or not Main.AutoFarm
+                end
+            end
+        end)
+        runservice.Heartbeat:wait();
+    end
+end)
+C1:addToggle("Auto Quest", false, function(v)
+    Main.AutoQuest = v
+end)
+
+--[[
+    Tab - ESP
+]]
+
+C999:addLabel("ESP")
+C999:addToggle("Enabled", false, function(v)
+    ESP.Enabled = v
+end)
+
+C999:addToggle("Name", false, function(v)
+    ESP.Name = v
+end)
+C999:addToggle("Boxes", false, function(v)
+    ESP.Boxes = v
+end)
+C999:addToggle("Line", false, function(v)
+    ESP.Line = v
+end)
+
+--// ESP //--
+
+--# Data #--
+local Luffy,Zoro,Usopp,Sanji = {}, {}, {}, {}
+
+--# Part Position to Screen #--
+local function pog(Part, i)
+    if not Part then 
+        Zoro[i].Visible = false; 
+        Usopp[i].Visible = false; 
+        Sanji[i].Visible = false; 
+        return Vector2.new(0,0) 
+    end
+
+    local pos,vis = cam:WorldToScreenPoint(Part.Position)
+    if vis then 
+        Zoro[i].Visible = ESP.Name;
+        Usopp[i].Visible = ESP.Boxes;
+        Sanji[i].Visible = ESP.Line;
+        return Vector2.new(pos.X, pos.Y) 
+    else 
+        Zoro[i].Visible = false;
+        Usopp[i].Visible = false;
+        Sanji[i].Visible = false;
+        return Vector2.new(0,0) 
+    end
+end
+
+--# Some Functions #--
+local function kelltable(t)
+    for i in pairs(t) do t[i] = nil end
+end
+local function killesp(t)
+    for i in pairs(t) do t[i].Remove(t[i]) end
+end
+local function kekwis(t, val)
+    for i,v in pairs(t) do if val == v then return true end end
+    return false
+end
+local function eekkucing(p)
+    local s = p.Size
+    return {TR = (p.CFrame * CFrame.new(-s.X, -s.Y, 0)),BR = (p.CFrame * CFrame.new(-s.X, s.Y, 0)),TL = (p.CFrame * CFrame.new(s.X, -s.Y, 0)),BL = (p.CFrame * CFrame.new(s.X, s.Y, 0)),}
+end
+
+--# Main Part #--
+function gtfo()
+    for i,v in pairs(plr.Parent:GetChildren()) do
+        if not kekwis(Luffy, v.Name) then
+            table.insert(Luffy, v.Name)
+            table.insert(Zoro, Drawing.new("Text"))
+            table.insert(Usopp, Drawing.new("Quad"))
+            table.insert(Sanji, Drawing.new("Line"))
+            if v.Name ~= plr.Name then
+                pcall(function()
+                    --// Name //--
+                    Zoro[i].Text = Luffy[i];
+                    Zoro[i].Size = 14.0;
+                    Zoro[i].Outline = true;
+                    Zoro[i].Center = true;
+                    Zoro[i].Position = pog(v.Character.Head, i);
+
+                    --// Boxes //--
+                    local cake = eekkucing(v.Character.HumanoidRootPart)
+                    local topright,bottomright,topleft,bottomleft = pog(cake.TR, i),pog(cake.BR, i),pog(cake.TL, i),pog(cake.BL, i)
+                    Usopp[i].PointA = topright + Vector2.new(0, 36)
+                    Usopp[i].PointB = topleft + Vector2.new(0, 36)
+                    Usopp[i].PointC = bottomleft + Vector2.new(0, 36)
+                    Usopp[i].PointD = bottomright + Vector2.new(0, 36)
+                    Usopp[i].Thickness = 1.6;
+
+                    --// Line //--
+                    local cookie = pog(v.Character.HumanoidRootPart, i);
+                    Sanji[i].Thickness = 1.6;
+                    Sanji[i].From = Vector2.new(v.Character.HumanoidRootPart.Position.X, v.Character.HumanoidRootPart.Position.Y)--Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2);
+                    Sanji[i].To = cookie + Vector2.new(0, 36)
+
+                    Zoro[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+                    Usopp[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+                    Sanji[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+                end)
+            else
+                if table.find(Luffy, plr.Name) then
+                    Zoro[i].Transparency = 0;
+                    Usopp[i].Transparency = 0;
+                    Sanji[i].Transparency = 0;
+                end
+            end
+        else
+            pcall(function()
+                Zoro[i].Position = pog(v.Character.Head, i);
+
+                local cake = eekkucing(v.Character.HumanoidRootPart)
+                local topright,bottomright,topleft,bottomleft = pog(cake.TR, i),pog(cake.BR, i),pog(cake.TL, i),pog(cake.BL, i)
+                Usopp[i].PointA = topright + Vector2.new(0, 36)
+                Usopp[i].PointB = topleft + Vector2.new(0, 36)
+                Usopp[i].PointC = bottomleft + Vector2.new(0, 36)
+                Usopp[i].PointD = bottomright + Vector2.new(0, 36)
+
+                Sanji[i].From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2 + cam.ViewportSize.Y / 2);
+                Sanji[i].To = pog(v.Character.HumanoidRootPart, i);
+
+                Zoro[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+                Usopp[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+                Sanji[i].Color = v.TeamColor.Color or Color3.fromRGB(75,75,255);
+            end)
+        end
+    end
+end
+
+spawn(function()
+    serv.Players.PlayerAdded:connect(function(player)
+        ESP.Enabled = false;
+        killesp(Zoro)
+        killesp(Usopp)
+        killesp(Sanji)
+        kelltable(Zoro)
+        kelltable(Usopp)
+        kelltable(Sanji)
+        kelltable(Luffy)
+        ESP.Enabled = true;
+    end)
+    
+    serv.Players.PlayerRemoving:connect(function(player)
+        ESP.Enabled = false;
+        killesp(Zoro)
+        killesp(Usopp)
+        killesp(Sanji)
+        kelltable(Zoro)
+        kelltable(Usopp)
+        kelltable(Sanji)
+        kelltable(Luffy)
+        ESP.Enabled = true;
+    end)
+    
+    runservice.RenderStepped:connect(function()
+        if ESP.Enabled then
+            gtfo()
+        else
+            killesp(Zoro)
+            killesp(Usopp)
+            killesp(Sanji)
+            kelltable(Zoro)
+            kelltable(Usopp)
+            kelltable(Sanji)
+            kelltable(Luffy)
+        end
+    
+        runservice.RenderStepped:wait();
+        runservice.Heartbeat:wait();
+    end)
+end)
+
+--// End ESP //--
+
+--[[
+    Tab - Client
+]]
+
+--// Walkspeed Changer //--
+local _A,_B = plr.Character.Humanoid.WalkSpeed, plr.Character.Humanoid.JumpPower;
+local A1,B1 = plr.Character.Humanoid.WalkSpeed, plr.Character.Humanoid.JumpPower
+
+C1000:addSlider("WS", A1, A1, 300, function(v)
+    _A = v
+end)
+C1000:addBlank()
+C1000:addSlider("JP", B1, B1, 300, function(v)
+    _B = v
+end)
+C1000:addBlank()
+C1000:addToggle("Set WS", false, function(v)
+    rAZY = v
+    local s;
+    s = runservice.RenderStepped:Connect(function()
+        if rAZY == true then pcall(function() plr.Character.Humanoid.WalkSpeed = _A end) end
+        if rAZY == false then pcall(function() plr.Character.Humanoid.WalkSpeed = A1; s:Disconnect() end) end
+    end)
+end)
+C1000:addToggle("Set JP", false, function(v)
+    YW4o = v
+    local s;
+    s = runservice.RenderStepped:Connect(function()
+        if YW4o == true then pcall(function() plr.Character.Humanoid.JumpPower = _B end) end
+        if YW4o == false then pcall(function() plr.Character.Humanoid.JumpPower = B1; s:Disconnect() end) end
+    end)
+end)
+
+--// Humanoid Changer //--
+C1000:addToggle("No Clip", false, function(v)
+    beeX = v
+    local s;
+    s = runservice.RenderStepped:Connect(function()
+        if beeX == true then pcall(function() plr.Character.Humanoid:ChangeState(10); plr.Character.HumanoidRootPart.Velocity = Vector3.new(); end) end
+        if beeX == false then s:Disconnect() end
+    end)
+end)
